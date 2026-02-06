@@ -1,0 +1,56 @@
+# Data
+data/raw/
+data/parsed/
+data/aligned/
+data/splits/
+
+# Model checkpoints & outputs
+checkpoints/
+outputs/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.gguf
+
+# HuggingFace cache
+.cache/
+huggingface/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+wandb/
+runs/
+tmp/
+
+# Secrets
+.env
+*.key
