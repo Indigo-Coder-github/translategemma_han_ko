@@ -1,8 +1,11 @@
-# Data
+# Data (actual data files — samples/ and README.md are tracked)
 data/raw/
 data/parsed/
-data/aligned/
+data/processed/
 data/splits/
+data/eval/
+!data/samples/
+!data/README.md
 
 # Model checkpoints & outputs
 checkpoints/
