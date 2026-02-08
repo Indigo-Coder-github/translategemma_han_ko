@@ -55,12 +55,54 @@ def article_id_to_korean_id(article_id: str) -> str:
 def strip_html_tags(text: str) -> str:
     """HTML 태그를 제거하고 텍스트만 추출한다."""
     text = re.sub(r"<[^>]+>", "", text)
+    text = _decode_html_entities(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def extract_translation_from_html(html: str) -> str:
+    """contentHg HTML에서 번역 텍스트를 추출한다.
+
+    content 필드는 각주(역자 주석)가 본문에 인라인되어 섞이지만,
+    contentHg는 각주를 <a class="footnote_super"><sup>001)</sup></a>
+    마커로만 표시하고 각주 본문은 footnoteHg에 분리되어 있다.
+
+    처리:
+    - <sup> 태그 제거 (각주 번호 001), 002) 등)
+    - 나머지 HTML 태그 제거 (텍스트 보존)
+    - HTML 엔티티 디코딩, 다중 공백 정리
+    """
+    # <sup>...</sup> 제거 (각주 번호)
+    text = re.sub(r"<sup[^>]*>.*?</sup>", "", html)
+    # 나머지 HTML 태그 제거
+    text = re.sub(r"<[^>]+>", "", text)
+    text = _decode_html_entities(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def extract_footnotes(footnote_html: str) -> str:
+    """footnoteHg HTML에서 각주 텍스트를 추출한다.
+
+    입력 예:
+        <li><a href="#footnote_view1" id="footnote_1">[註 001]</a>
+            시좌궁(時坐宮) : 그 당시에 왕이 거처하던 궁전.</li>
+
+    출력: "[註 001] 시좌궁(時坐宮) : 그 당시에 왕이 거처하던 궁전."
+    """
+    text = re.sub(r"<[^>]+>", "", footnote_html)
+    text = _decode_html_entities(text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _decode_html_entities(text: str) -> str:
+    """HTML 엔티티를 디코딩한다."""
     text = re.sub(r"&nbsp;", " ", text)
     text = re.sub(r"&amp;", "&", text)
     text = re.sub(r"&lt;", "<", text)
     text = re.sub(r"&gt;", ">", text)
     text = re.sub(r"&quot;", '"', text)
-    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 
@@ -117,16 +159,23 @@ def fetch_day_translations(
 
         content = sr.get("content")
         content_hg = sr.get("contentHg")
+        footnote_hg = sr.get("footnoteHg")
 
+        # contentHg 우선 사용 (content에는 각주가 본문에 인라인됨)
         translation = None
-        if content and isinstance(content, str):
+        if content_hg and isinstance(content_hg, str):
+            translation = extract_translation_from_html(content_hg)
+        elif content and isinstance(content, str):
             translation = strip_html_tags(content)
-        elif content_hg and isinstance(content_hg, str):
-            translation = strip_html_tags(content_hg)
+
+        footnotes = None
+        if footnote_hg and isinstance(footnote_hg, str):
+            footnotes = extract_footnotes(footnote_hg)
 
         result[original_id] = {
             "translation": translation,
             "korean_id": sr_id,
+            "footnotes": footnotes,
         }
 
     return result
@@ -316,11 +365,13 @@ def main() -> None:
                 if has_error:
                     article_out["translation"] = None
                     article_out["korean_id"] = None
+                    article_out["footnotes"] = None
                     stats["error"] += 1
                 elif aid in day_result:
                     kr = day_result[aid]
                     article_out["translation"] = kr["translation"]
                     article_out["korean_id"] = kr["korean_id"]
+                    article_out["footnotes"] = kr.get("footnotes")
                     if kr["translation"]:
                         stats["success"] += 1
                     else:
@@ -328,6 +379,7 @@ def main() -> None:
                 else:
                     article_out["translation"] = None
                     article_out["korean_id"] = None
+                    article_out["footnotes"] = None
                     stats["no_translation"] += 1
 
                 out_f.write(json.dumps(article_out, ensure_ascii=False) + "\n")

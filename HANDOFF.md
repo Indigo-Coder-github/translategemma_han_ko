@@ -16,10 +16,12 @@ Google TranslateGemma (Gemma 3 기반)를 LoRA 파인튜닝.
    - `scripts/parsers/parse_sillok.py` → `data/parsed/sillok/articles.jsonl`
    - 743개 XML 파일 → 414,024건, 7,259만자
 
-2. **국역 수집 스크립트** ✅
+2. **국역 수집 스크립트** ✅ (2026-02-08 수정)
    - `scripts/scrape_sillok_korean.py`
    - 일자 단위 배치 API 요청 (158,860일)
    - sillok.history.go.kr JSON API, 랜덤 1~5초 대기
+   - **수정**: `content` → `contentHg` 우선 사용 (각주 인라인 혼입 해결)
+   - **수정**: `footnoteHg` 별도 파싱하여 `footnotes` 필드로 분리 저장
 
 3. **데이터 분석** ✅
    - 왕대별 길이 분포, 기록 밀도 분석
@@ -28,11 +30,11 @@ Google TranslateGemma (Gemma 3 기반)를 LoRA 파인튜닝.
 
 ### 진행 중
 
-4. **국역 수집 실행 중** 🔄
-   - 로컬 PC cmd에서 태조부터 수집 중
-   - `python scripts/scrape_sillok_korean.py --delay-min 1 --delay-max 5 --king 태조`
-   - 태조 완료 후: `--king` 제거 + `--resume`으로 전체 이어서 수집
+4. **국역 재수집 실행 중** 🔄
+   - 각주 인라인 혼입 문제 수정 후 전체 재수집 시작 (2026-02-08)
+   - `python scripts/scrape_sillok_korean.py --delay-min 1 --delay-max 5`
    - 전체 약 4~5일 소요 예상
+   - `--resume` 옵션으로 중단 시 재개 가능
 
 5. **데이터 처리 파이프라인** ✅ (2026-02-08 완료)
    - 3단계 스크립트 구현 및 테스트 완료
@@ -48,12 +50,20 @@ Google TranslateGemma (Gemma 3 기반)를 LoRA 파인튜닝.
 7. **추론 스크립트** ✅ (2026-02-08 완료)
    - `inference/translate.py`
    - HF transformers / vLLM 엔진 선택 가능
-   - vLLM: Infomaniak-AI 수정 모델 자동 매핑
+   - vLLM: 현재 NotImplementedError (PR #32819 미머지)
+
+8. **국역 수집기 각주 분리 수정** ✅ (2026-02-08 완료)
+   - 문제: `content` 필드에 역자 각주가 본문에 인라인 혼입
+     - 예: `시좌궁(時坐宮) 그 당시에 왕이 거처하던 궁전.` 이 본문에 삽입됨
+   - 원인: API의 `content` 필드는 plain text로 각주를 본문에 포함
+   - 해결: `contentHg` (HTML) 우선 사용, `<sup>` 각주 번호만 제거
+   - 각주는 `footnoteHg` 필드에서 별도 추출하여 `footnotes` 필드로 저장
+   - 검증: `waa_10107017_001` (태조 즉위) 기사에서 4개 각주 모두 분리 확인
 
 ### 미착수
 
-8. **LoRA 파인튜닝**
-9. **Gradio 데모**
+9. **LoRA 파인튜닝**
+10. **Gradio 데모**
 
 ## 확정된 훈련 데이터 전략
 
@@ -252,6 +262,18 @@ scripts/
 inference/
   translate.py                    # 추론 (HF / vLLM 선택)
 ```
+
+## sillok.history.go.kr API 구조
+
+`GET /search/collectView.do?id={day_id}` 응답의 `sillokResult[]` 내 국역(k 접두사) 항목 필드:
+
+| 필드 | 내용 | 사용 여부 |
+|------|------|----------|
+| `content` | plain text, 각주가 본문에 인라인 혼입 | ❌ fallback만 |
+| `contentHg` | HTML, 각주는 `<sup>` 마커로만 표시 | ✅ **우선 사용** |
+| `footnoteHg` | HTML, 각주 목록 (`[註 001]`, `[註 002]` 등) | ✅ 별도 저장 |
+
+`contentHg`에서 `<sup>` 태그 제거 → HTML 태그 제거 → 엔티티 디코딩으로 깨끗한 번역문 추출.
 
 ## Gemma 3 / TranslateGemma 주의사항
 

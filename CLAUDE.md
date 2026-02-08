@@ -72,6 +72,8 @@ Google TranslateGemma (2026년 1월 공개, Gemma 3 기반 번역 특화 모델)
 국역(한국어 번역)은 sillok.history.go.kr JSON API로 별도 수집:
 - `GET /search/collectView.do?id={day_id}` (일자 단위 배치)
 - 총서(2-part ID)는 API 미지원, 본문(3-part ID)만 가능
+- 응답의 `contentHg` (HTML) 우선 사용 (`content`는 각주 인라인 혼입 문제)
+- `footnoteHg`에서 각주를 별도 추출하여 `footnotes` 필드로 분리 저장
 - 저작권: 학술·연구 목적 이용 가능, 상업적 이용 불가 (국사편찬위원회)
 
 XML 파일 규칙:
@@ -120,12 +122,14 @@ TranslateGemma는 Gemma 3 기반 멀티모달 모델로 I2T(이미지→번역) 
 
 `source` 필드로 데이터 출처를 구분하여 향후 다른 소스 추가 시 통합 가능.
 
-### 2. 국역 수집 🔄 진행중
+### 2. 국역 수집 🔄 재수집 진행중
 
 `scripts/scrape_sillok_korean.py` → `data/parsed/sillok/articles_with_korean.jsonl`
 
 - 일자 단위 배치 요청 (기사 단위 41만 회 → 일자 단위 16만 회, 62% 절감)
 - 랜덤 1~5초 대기, 재시도 3회, resume 지원
+- `contentHg` 우선 사용 (각주 인라인 혼입 해결), `footnoteHg` 별도 분리
+- 2026-02-08 수정 후 전체 재수집 시작
 
 ### 3. 필터링 및 정제 ✅ 완료
 
