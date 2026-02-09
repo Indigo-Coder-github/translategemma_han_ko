@@ -359,6 +359,7 @@ def main() -> None:
     articles: list[dict] = []
     total_loaded = 0
     skipped_no_translation = 0
+    skipped_ids: list[dict] = []  # 번역 없는 기사 기록용
 
     with open(input_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -367,6 +368,10 @@ def main() -> None:
 
             if not article.get("translation"):
                 skipped_no_translation += 1
+                skipped_ids.append({
+                    "article_id": article.get("article_id", ""),
+                    "king": article.get("king", ""),
+                })
                 continue
 
             articles.append(article)
@@ -379,6 +384,21 @@ def main() -> None:
         f"번역 있음: {len(articles):,}건, "
         f"번역 없음: {skipped_no_translation:,}건 제외"
     )
+
+    # 번역 없는 기사 목록 저장
+    if skipped_ids:
+        skipped_path = output_path.parent / "skipped_no_translation.jsonl"
+        with open(skipped_path, "w", encoding="utf-8") as sf:
+            for item in skipped_ids:
+                sf.write(json.dumps(item, ensure_ascii=False) + "\n")
+        # 왕대별 집계
+        king_counts: dict[str, int] = {}
+        for item in skipped_ids:
+            k = item["king"] or "unknown"
+            king_counts[k] = king_counts.get(k, 0) + 1
+        print(f"[INFO] 번역 없는 기사 목록: {skipped_path}")
+        for k, c in sorted(king_counts.items()):
+            print(f"  {k}: {c:,}건")
 
     # ------------------------------------------------------------------
     # Step 2: (original, translation) 해시 기준 완전 중복 제거

@@ -7,8 +7,12 @@ data/eval/
 !data/samples/
 !data/README.md
 
+# Claude Code local settings
+.claude/
+
 # Model checkpoints & outputs
 checkpoints/
+output/
 outputs/
 *.safetensors
 *.bin

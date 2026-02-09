@@ -304,6 +304,12 @@ def main() -> None:
     eta_h = len(day_ids_sorted) * avg_delay / 3600
 
     print(f"[INFO] 수집 대상: {len(day_ids_sorted):,}일 ({remaining_articles:,}건)")
+    if day_ids_sorted:
+        first_day = day_ids_sorted[0]
+        first_king = day_groups[first_day][0]["king"] if day_groups[first_day] else "?"
+        last_day = day_ids_sorted[-1]
+        last_king = day_groups[last_day][0]["king"] if day_groups[last_day] else "?"
+        print(f"[INFO] 시작: {first_king} {first_day} → 끝: {last_king} {last_day}")
     print(f"[INFO] 대기: {args.delay_min}~{args.delay_max}초 (평균 {avg_delay:.1f}초)")
     print(f"[INFO] 예상 소요: {eta_h:.1f}시간 ({eta_h/24:.1f}일)")
     print()

@@ -1,7 +1,7 @@
 # 작업 인수인계 문서
 
 > 다른 기기에서 작업 이어가기 위한 현재 상태 요약
-> 작성일: 2026-02-07 (최종 갱신: 2026-02-08)
+> 작성일: 2026-02-07 (최종 갱신: 2026-02-10)
 
 ## 프로젝트 요약
 
@@ -60,10 +60,25 @@ Google TranslateGemma (Gemma 3 기반)를 LoRA 파인튜닝.
    - 각주는 `footnoteHg` 필드에서 별도 추출하여 `footnotes` 필드로 저장
    - 검증: `waa_10107017_001` (태조 즉위) 기사에서 4개 각주 모두 분리 확인
 
+9. **LoRA 파인튜닝 스크립트** ✅ (2026-02-10 완료)
+   - `training/finetune_lora.py` — 메인 학습 스크립트
+   - `training/configs/default.yaml` — 하이퍼파라미터 설정
+   - HF Transformers `Trainer` + PEFT LoRA (rsLoRA)
+   - 주요 설계:
+     - Loss 마스킹: `<start_of_turn>model\n` 이후 토큰만 loss 계산
+     - target modules: q/k/v/o_proj + gate/up/down_proj (7개)
+     - rank=64, alpha=64, rsLoRA 활성화
+     - gradient checkpointing + bf16 필수
+     - 데이터: hf_dataset(arrow) 우선, 없으면 JSONL 자동 폴백
+   - 실행: `python training/finetune_lora.py --config training/configs/default.yaml`
+   - Multi-GPU: `accelerate launch training/finetune_lora.py ...` (FSDP2)
+   - Resume: `--resume` 플래그로 마지막 체크포인트에서 재개
+   - Smoke test: `--model google/translategemma-4b-it --limit 100`
+
 ### 미착수
 
-9. **LoRA 파인튜닝**
-10. **Gradio 데모**
+10. **실제 파인튜닝 실행** (L40s 서버에서)
+11. **Gradio 데모**
 
 ## 확정된 훈련 데이터 전략
 
@@ -259,6 +274,10 @@ scripts/
   build_dataset.py                # 파이프라인 Step 3
   evaluate_baseline.py            # Baseline 평가
 
+training/
+  finetune_lora.py                # LoRA 파인튜닝 (HF Trainer + PEFT)
+  configs/default.yaml            # 하이퍼파라미터 설정
+
 inference/
   translate.py                    # 추론 (HF / vLLM 선택)
 ```
@@ -288,6 +307,8 @@ inference/
 
 ## 다음 작업 제안 (우선순위)
 
-1. **LoRA 파인튜닝 스크립트** — training/ 디렉토리 구성
-2. **XML `<index>` 태그 추출** — 고유명사 사전 구축
-3. **Gradio 데모** — demo/ 구현
+1. **국역 재수집 완료 대기** — 현재 진행중, 완료 후 파이프라인 재실행
+2. **L40s 서버에서 파인튜닝 실행** — `training/finetune_lora.py` 실행 + 결과 확인
+3. **평가 스크립트 구현** — 학습 후 BLEU/chrF/COMET 측정
+4. **XML `<index>` 태그 추출** — 고유명사 사전 구축
+5. **Gradio 데모** — demo/ 구현
