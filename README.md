@@ -7,27 +7,41 @@ TranslateGemma를 한문-한국어 병렬 코퍼스에 파인튜닝합니다.
 
 조선왕조실록을 시작으로 다양한 조선시대 한문 사료의 병렬 데이터를 활용하여, Google TranslateGemma 모델을 고전 한문 번역에 특화시키는 프로젝트입니다.
 
+## 설치
+
+```bash
+pip install -r requirements.txt
+```
+
 ## 데이터
 
 현재 [공공데이터포털](https://www.data.go.kr/data/15053647/fileData.do)의 조선왕조실록 XML 데이터를 사용합니다. (이용허락 제한 없음)
 
-> ⚠️ `data/` 디렉토리는 git 추적에서 제외됩니다. 아래 절차에 따라 직접 다운로드하세요.
+> `data/` 디렉토리는 git 추적에서 제외됩니다. 아래 절차에 따라 직접 준비하세요.
 
 ### 데이터 준비
 
 ```bash
 # 1. 공공데이터포털에서 XML 다운로드 후 data/raw/sillok/에 배치
-mkdir -p data/raw/sillok data/parsed data/aligned data/splits
+mkdir -p data/raw/sillok data/parsed data/processed data/splits
 
 # 2. XML 파싱
 python scripts/parsers/parse_sillok.py
 
-# 3. 문장 정렬
-python scripts/align_sentences.py
+# 3. 국역 수집 (sillok.history.go.kr API, 수일 소요)
+python scripts/scrape_sillok_korean.py --delay-min 1 --delay-max 5
 
-# 4. 필터링 및 분할
-python scripts/filter_and_split.py
+# 4. 필터링 + 역자 주석 제거 + variant 생성
+python scripts/prepare_pairs.py
+
+# 5. 문장 정렬 + 청킹
+python scripts/align_and_chunk.py
+
+# 6. 분할 + instruction 포맷 + HF Dataset
+python scripts/build_dataset.py --save-hf
 ```
+
+데이터 스키마 상세는 [`data/README.md`](data/README.md) 참조.
 
 ## 모델
 
@@ -40,8 +54,11 @@ python scripts/filter_and_split.py
 ## 학습
 
 ```bash
-# LoRA 파인튜닝 (L40s x2)
-python training/finetune_lora.py --config training/configs/12b_lora.yaml
+# LoRA 파인튜닝
+python training/finetune_lora.py --config training/configs/default.yaml
+
+# Multi-GPU (FSDP2)
+accelerate launch training/finetune_lora.py --config training/configs/default.yaml
 ```
 
 ## 데모
@@ -53,7 +70,7 @@ python demo/app.py
 ## 환경
 
 - Python 3.10+
-- GPU: L40s × 2 (학습), RTX 3060Ti (로컬 테스트)
+- GPU: L40s x 2 (학습), RTX 3060Ti (로컬 테스트)
 - 주요 의존성: transformers, peft, accelerate, datasets, gradio
 
 ## 라이선스

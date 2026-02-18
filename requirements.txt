@@ -1,0 +1,21 @@
+# Core ML
+torch
+transformers
+peft
+accelerate
+datasets
+
+# Training config
+PyYAML
+
+# Data collection
+requests
+
+# Evaluation
+sacrebleu
+
+# Optional
+# unbabel-comet    # COMET 평가 (선택)
+# bitsandbytes     # 양자화 (Linux only)
+# gradio           # 데모 UI
+# vllm             # 추론 서버

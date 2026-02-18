@@ -69,11 +69,15 @@ def extract_translation_from_html(html: str) -> str:
 
     처리:
     - <sup> 태그 제거 (각주 번호 001), 002) 등)
+    - <a class="footnote_super"> 앵커 제거 (내부 텍스트 보존, trailing space 제거)
     - 나머지 HTML 태그 제거 (텍스트 보존)
     - HTML 엔티티 디코딩, 다중 공백 정리
     """
     # <sup>...</sup> 제거 (각주 번호)
     text = re.sub(r"<sup[^>]*>.*?</sup>", "", html)
+    # footnote_super 앵커: 내부 텍스트 보존, 앵커+trailing space 제거
+    # 예: 시좌궁(時坐宮)<a class="footnote_super"></a> 에 → 시좌궁(時坐宮)에
+    text = re.sub(r'<a[^>]*class="footnote_super"[^>]*>(.*?)</a>\s*', r'\1', text)
     # 나머지 HTML 태그 제거
     text = re.sub(r"<[^>]+>", "", text)
     text = _decode_html_entities(text)
@@ -163,10 +167,13 @@ def fetch_day_translations(
 
         # contentHg 우선 사용 (content에는 각주가 본문에 인라인됨)
         translation = None
+        content_source = None
         if content_hg and isinstance(content_hg, str):
             translation = extract_translation_from_html(content_hg)
+            content_source = "contentHg"
         elif content and isinstance(content, str):
             translation = strip_html_tags(content)
+            content_source = "content"
 
         footnotes = None
         if footnote_hg and isinstance(footnote_hg, str):
@@ -176,6 +183,7 @@ def fetch_day_translations(
             "translation": translation,
             "korean_id": sr_id,
             "footnotes": footnotes,
+            "content_source": content_source,
         }
 
     return result
@@ -378,6 +386,7 @@ def main() -> None:
                     article_out["translation"] = kr["translation"]
                     article_out["korean_id"] = kr["korean_id"]
                     article_out["footnotes"] = kr.get("footnotes")
+                    article_out["content_source"] = kr.get("content_source")
                     if kr["translation"]:
                         stats["success"] += 1
                     else:

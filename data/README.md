@@ -19,7 +19,7 @@ data/parsed/sillok/articles_with_korean.jsonl   (국역 수집 결과)
   data/processed/sillok/chunked_pairs.jsonl
   │
   ▼ [Step 3] python scripts/build_dataset.py --save-hf
-  │   왕대별 train/val/test 분할 → Gemma 3 instruction 포맷 → HF Dataset 저장
+  │   랜덤 80:10:10 분할 → Gemma 3 instruction 포맷 → HF Dataset 저장
   │
   data/splits/{train,val,test}.jsonl + data/splits/hf_dataset/
 ```
@@ -149,14 +149,16 @@ Stage 0의 모든 필드 + 아래 2개 추가:
 | `token_count` | integer | 토큰 수 |
 | `variant` | string | 괄호 한자 처리 방식 |
 
-### 데이터 분할 기준 (왕대)
+### 데이터 분할 기준
 
-| split | 왕대 | king_code |
-|-------|------|-----------|
-| train | 태조 ~ 성종 | `aa` ~ `ia` |
-| val | 연산군 ~ 명종 | `ja` ~ `ma` |
-| test | 선조 ~ 철종 | `na` ~ `ya` |
-| (제외) | 고종, 순종 | `za` ~ `zc` |
+랜덤 셔플 후 80:10:10 분할 (seed=42, 재현 가능).
+
+| 항목 | 설명 |
+|------|------|
+| 분할 방식 | 전체 데이터 랜덤 셔플 후 비율 분할 |
+| 비율 | train 80% / val 10% / test 10% |
+| seed | 42 |
+| 제외 | 고종·순종 (`za`~`zc`) — 근대 문체 전환기, 일본어·서양 용어 혼용 |
 
 ### Gemma 3 instruction 포맷
 

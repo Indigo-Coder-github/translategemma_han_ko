@@ -69,7 +69,7 @@
 - 1~2 블록 unfreeze + 나머지 LoRA → full pre-training 상회
 - **참고**: 텍스트 모델에도 유사 전략 가능 (Phase 2 후보)
 
-### 기존 HANDOFF.md에 기록된 연구
+### 기존 연구
 - **H2KE (Son et al., EMNLP 2022)**: 동일 실록 데이터, mBART 기반, 한문→구역→현대한국어 2단계
 - **Khayrallah & Koehn (2018)**: 타겟에 소스 언어 복사가 NMT에 가장 치명적
 - **Don't Just Scratch the Surface (IJCNLP 2019)**: 한자 주석이 의미 구분에 도움

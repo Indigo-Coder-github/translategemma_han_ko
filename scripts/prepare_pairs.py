@@ -99,6 +99,10 @@ def remove_translator_notes(text: str, mode: str = "strict") -> tuple[str, int]:
     예: ``시좌궁(時坐宮) 그 당시에 왕이 거처하던 궁전.``
          → ``시좌궁(時坐宮)`` (설명 부분만 제거)
 
+    orphaned term 처리: 주석 앞의 ``term(漢字)``가 텍스트 앞부분에 이미
+    등장하면, content 폴백으로 인한 중복 각주 삽입으로 판단하여
+    ``term(漢字)`` + 주석을 함께 제거한다.
+
     Args:
         text: 번역 텍스트
         mode: ``"strict"`` (높은 정밀도), ``"relaxed"`` (높은 재현율),
@@ -116,11 +120,30 @@ def remove_translator_notes(text: str, mode: str = "strict") -> tuple[str, int]:
     # 뒤에서부터 제거해야 인덱스가 밀리지 않는다
     for match in reversed(matches):
         note_text = match.group("note_text").strip()
-        if _is_note(note_text, mode):
-            start = match.start("note")
-            end = match.end("note")
-            text = text[:start] + text[end:]
-            notes_removed += 1
+        if not _is_note(note_text, mode):
+            continue
+
+        annotation = match.group("annotation")  # (漢字)
+        note_start = match.start("note")
+        note_end = match.end("note")
+
+        # --- orphaned term 탐지 ---
+        # 주석 바로 앞의 한글 term을 추출
+        pre_text = text[:match.start("annotation")]
+        korean_term_match = re.search(r"([가-힣]{1,10})$", pre_text)
+
+        if korean_term_match:
+            full_term = korean_term_match.group(1) + annotation
+            earlier_text = text[:korean_term_match.start()]
+            if full_term in earlier_text:
+                # 중복 각주 → term(漢字) + 주석 전체 제거
+                text = text[:korean_term_match.start()] + text[note_end:]
+                notes_removed += 1
+                continue
+
+        # 기본: 주석 설명만 제거
+        text = text[:note_start] + text[note_end:]
+        notes_removed += 1
 
     # 연속 공백 정리
     text = re.sub(r"  +", " ", text)
@@ -184,6 +207,28 @@ def _is_note(text: str, mode: str) -> bool:
         return True
 
     return False
+
+
+# ========================= trailing space 정리 ============================
+
+# (漢字) 뒤 trailing space + 조사 패턴
+# 예: (時坐宮) 에 → (時坐宮)에, (定昌君) 은 → (定昌君)은
+_TRAILING_SPACE_PARTICLE_RE = re.compile(
+    r"(\([" + CJK_RANGE + r"·]+\))"
+    r" (이|가|은|는|을|를|에|에서|의|와|과|으로|로|에게|도|만|까지|부터"
+    r"|보다|처럼|같이|에는|에도|으로서|로서|으로써|로써|이며|이고"
+    r"|이지만|이라|이라고|라고|라|라는)"
+    r"(?=[^가-힣]|$)"
+)
+
+
+def fix_trailing_spaces(text: str) -> str:
+    """(漢字) 뒤 trailing space를 조사 앞에서 제거한다.
+
+    scraper에서 footnote anchor 제거 시 남은 공백을 후처리.
+    예: ``시좌궁(時坐宮) 에`` → ``시좌궁(時坐宮)에``
+    """
+    return _TRAILING_SPACE_PARTICLE_RE.sub(r"\1\2", text)
 
 
 # ============================ 괄호 한자 처리 ==============================
@@ -428,6 +473,9 @@ def main() -> None:
     with open(output_path, "w", encoding="utf-8") as f:
         for i, article in enumerate(deduped, 1):
             translation = article["translation"]
+
+            # trailing space 정리 (scraper에서 남은 공백)
+            translation = fix_trailing_spaces(translation)
 
             # 역자 주석 제거
             cleaned_translation, notes_removed = remove_translator_notes(
