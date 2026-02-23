@@ -98,16 +98,15 @@ def summarize_validate() -> dict:
     inline_note = 0
 
     for r in read_jsonl(flagged_path):
-        flags = r.get("flags", [])
-        for f in flags:
-            if "trailing" in f:
-                trailing_space += 1
-            elif "한자 불일치" in f or "hanja" in f.lower():
-                hanja_mismatch += 1
-            elif "중복" in f or "duplicate" in f.lower():
-                duplicate_term += 1
-            elif "인라인" in f or "inline" in f.lower():
-                inline_note += 1
+        issues = r.get("issues", {})
+        if issues.get("trailing_space"):
+            trailing_space += 1
+        if issues.get("hanzi_mismatch"):
+            hanja_mismatch += 1
+        if issues.get("duplicate_term"):
+            duplicate_term += 1
+        if issues.get("inline_note"):
+            inline_note += 1
 
     flagged_count = count_lines(flagged_path)
     return {
