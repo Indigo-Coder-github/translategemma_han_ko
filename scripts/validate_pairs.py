@@ -110,13 +110,40 @@ def validate_article(
     # ----- 3. 인라인 각주 잔존: (漢字) 짧은설명. -----
     for m in INLINE_NOTE_RE.finditer(translation):
         note = m.group("note").strip()
-        # 본문 계속이 아닌 실제 각주인지 간단히 필터
-        first_word = note.split()[0] if note.split() else ""
+        note_clean = ANNOTATION_RE.sub("", note).strip()
+        first_word = note_clean.split()[0] if note_clean.split() else ""
+        # prepare_pairs.py의 CONTINUATION_WORDS와 동일하게 확장
         continuation_words = {
             "이", "가", "은", "는", "을", "를", "에", "에서",
             "의", "와", "과", "으로", "로", "에게", "도",
+            "만", "까지", "부터", "보다", "처럼", "같이",
+            "등", "등이", "등을", "등의", "등에", "등은", "등도",
+            "등에서", "등으로", "등과", "등에게",
+            "에는", "에도", "으로서", "로서", "으로써", "로써",
+            "이며", "이고", "이지만", "이라", "이라고",
         }
-        if first_word not in continuation_words and len(note) <= 30:
+        # 서술형 어미가 포함된 텍스트는 본문 연속으로 판단
+        sentence_verb_endings = [
+            "었다", "았다", "습니다", "하였다", "되었다", "있었다",
+            "하여", "하니", "하므로", "하는데", "었으며", "었는데",
+            "하였으며", "이다", "이었다", "였다",
+            "했다", "됐다",
+        ]
+        # 축약형 과거 어미 탐지 (썼다, 봤다, 왔다, 갔다 등): ㅆ받침+다
+        def _contains_contracted_past_local(t: str) -> bool:
+            for i in range(len(t) - 1):
+                c = t[i]
+                if "\uAC00" <= c <= "\uD7A3" and (ord(c) - 0xAC00) % 28 == 20:
+                    if t[i + 1] == "다":
+                        return True
+            return False
+
+        if (
+            first_word not in continuation_words
+            and len(note_clean) <= 30
+            and not any(ve in note_clean for ve in sentence_verb_endings)
+            and not _contains_contracted_past_local(note_clean)
+        ):
             issues["inline_note"].append(
                 f"...{m.group()[:60]}"
             )

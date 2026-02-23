@@ -58,11 +58,28 @@ STRICT_NOTE_ENDINGS = [
     "을 뜻함", "를 뜻함",
     "을 의미한 것임", "를 의미한 것임",
     "을 의미함", "를 의미함",
+    "의 뜻이다", "이라는 뜻이다", "라는 뜻이다",
+    "의 이름이다", "을 이름이다", "라는 이름이다",
+    "라고도 한다", "라고도 함", "라고도 불린다",
     "의 파자",
     "을 점치는 사람", "를 점치는 사람",
     "을 이름", "를 이름",
     "의 별칭", "의 이칭",
     "의 약칭",
+]
+
+# ---------------------------------------------------------------------------
+# 본문 문장 어미 (이것이 포함된 텍스트는 역자 주석이 아닌 본문)
+# 길이에 관계없이 전체 판정에 적용
+# ---------------------------------------------------------------------------
+SENTENCE_VERB_ENDINGS = [
+    "었다", "았다", "습니다", "하였다", "되었다", "있었다",
+    "하여", "하니", "하므로", "하는데", "었으며",
+    "었는데", "하였으며",
+    # 단순 서술형 어미: "아들이다", "참찬이었다" 등 전기 본문 오탐지 방지
+    "이다", "이었다", "였다",
+    # 축약형 과거 어미 (대표 패턴)
+    "했다", "됐다",
 ]
 
 # ---------------------------------------------------------------------------
@@ -150,6 +167,26 @@ def remove_translator_notes(text: str, mode: str = "strict") -> tuple[str, int]:
     return text, notes_removed
 
 
+def _contains_contracted_past(text: str) -> bool:
+    """텍스트 어디서든 축약형 과거 어미(썼다, 봤다, 왔다, 갔다 등)를 탐지한다.
+
+    한국어 모음 축약: 쓰+었+다 → 썼다 (ㅆ받침)
+    ㅆ받침 음절(Unicode 종성 인덱스 20) 바로 다음에 '다'가 오면 축약형 과거 어미.
+
+    Unicode 한글 음절: code = 0xAC00 + (초성*21 + 중성)*28 + 종성
+    → 종성 인덱스 = (code - 0xAC00) % 28
+    → ㅆ = 종성 인덱스 20
+
+    '썼다고', '썼다며', '썼다는' 등 뒤에 다른 어미가 붙은 경우도 모두 감지.
+    """
+    for i in range(len(text) - 1):
+        c = text[i]
+        if "\uAC00" <= c <= "\uD7A3" and (ord(c) - 0xAC00) % 28 == 20:
+            if text[i + 1] == "다":
+                return True
+    return False
+
+
 def _is_note(text: str, mode: str) -> bool:
     """주어진 텍스트가 역자 주석인지 판별한다."""
     stripped = text.strip()
@@ -164,25 +201,30 @@ def _is_note(text: str, mode: str) -> bool:
     first_word = stripped_clean.split()[0] if stripped_clean.split() else ""
 
     if mode == "strict":
-        # 1. 알려진 종결 패턴 (가장 확실)
+        # 1. 알려진 종결 패턴 (가장 확실 — 어미 체크 전에 먼저 적용)
         for ending in STRICT_NOTE_ENDINGS:
             if stripped_clean.endswith(ending):
                 return True
 
-        # 2. 매우 짧은 교차 참조 (≤10자, 조사 시작 제외)
-        if len(stripped_clean) <= 10 and first_word not in CONTINUATION_WORDS:
+        # 2. 조사/연결어로 시작하면 본문 연속
+        if first_word in CONTINUATION_WORDS:
+            return False
+
+        # 3. 서술형 어미 포함 시 본문으로 판정 (길이 무관하게 적용)
+        #    "아들이다", "아들이었다" 등 전기 본문이 각주로 오판되는 것을 방지
+        if any(ve in stripped_clean for ve in SENTENCE_VERB_ENDINGS):
+            return False
+        # 3b. 축약형 과거 어미: 썼다, 봤다, 왔다, 갔다 등 (SENTENCE_VERB_ENDINGS 미포함)
+        #     ㅆ받침(인덱스 20)+다 패턴이 텍스트 내 어디서든 발견되면 본문으로 판정
+        if _contains_contracted_past(stripped_clean):
+            return False
+
+        # 4. 교차 참조 / 짧은 설명구 (≤20자)
+        if len(stripped_clean) <= 10:
             return True
 
-        # 3. 짧은 설명구 (11~20자): 서술형 어미가 없으면 주석으로 판정
-        #    예: "그 당시에 왕이 거처하던 궁전" (16자, 명사로 끝남)
-        if 10 < len(stripped_clean) <= 20 and first_word not in CONTINUATION_WORDS:
-            sentence_endings = [
-                "었다", "습니다", "하였다", "되었다", "있었다",
-                "하여", "하니", "하므로", "하는데", "었으며",
-                "었는데", "하였으며",
-            ]
-            if not any(ve in stripped_clean for ve in sentence_endings):
-                return True
+        if len(stripped_clean) <= 20:
+            return True
 
         return False
 
