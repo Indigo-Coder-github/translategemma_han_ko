@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -465,6 +466,51 @@ def main() -> None:
     print(f"  청킹 대상: {chunked_articles:,}건 → {total_chunks:,}청크 (평균 {avg_chunks:.1f})")
     if over_limit_singles:
         print(f"  분할 불가 (구점 없음): {over_limit_singles:,}건 (초과 상태로 통과)")
+
+    # ------------------------------------------------------------------
+    # 실행 로그 저장
+    # ------------------------------------------------------------------
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "script": "align_and_chunk.py",
+        "args": {
+            "input": str(input_path),
+            "output": str(output_path),
+            "model": args.model,
+            "max_tokens": args.max_tokens,
+            "chunk_size": args.chunk_size,
+            "overlap": args.overlap,
+            "limit": args.limit,
+        },
+        "stats": {
+            "pass_through": pass_through,
+            "chunked_articles": chunked_articles,
+            "total_chunks": total_chunks,
+            "avg_chunks_per_article": round(avg_chunks, 1),
+            "over_limit_singles": over_limit_singles,
+            "output_count": output_count,
+        },
+    }
+    log_path = log_dir / f"align_and_chunk_{timestamp}.json"
+    log_path.write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[INFO] 실행 로그: {log_path}")
+
+    # ------------------------------------------------------------------
+    # 샘플 저장 (첫 10건)
+    # ------------------------------------------------------------------
+    sample_dir = Path("data/samples")
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    sample_path = sample_dir / f"{output_path.stem}.sample.jsonl"
+    with open(output_path, "r", encoding="utf-8") as fin, \
+         open(sample_path, "w", encoding="utf-8") as fout:
+        for i, line in enumerate(fin):
+            if i >= 10:
+                break
+            fout.write(line)
+    print(f"[INFO] 샘플 저장: {sample_path}")
 
 
 if __name__ == "__main__":

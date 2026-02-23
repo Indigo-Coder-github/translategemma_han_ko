@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -275,6 +276,62 @@ def main() -> None:
             vc = vd.get(v, 0)
             pct = vc / count * 100 if count > 0 else 0
             print(f"    {v}: {vc:,}건 ({pct:.1f}%)")
+
+    # ------------------------------------------------------------------
+    # 실행 로그 저장
+    # ------------------------------------------------------------------
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "script": "build_dataset.py",
+        "args": {
+            "input": str(input_path),
+            "output_dir": str(output_dir),
+            "seed": args.seed,
+            "train_ratio": train_ratio,
+            "val_ratio": val_ratio,
+            "test_ratio": test_ratio,
+            "limit": args.limit,
+        },
+        "stats": {
+            "total": total,
+            "excluded": excluded_count,
+            "splits": {
+                split_name: {
+                    "count": split_counts[split_name],
+                    "avg_tokens": round(split_token_sums[split_name] / split_counts[split_name], 1) if split_counts[split_name] else 0,
+                    "variants": {
+                        v: {"count": variant_per_split[split_name].get(v, 0),
+                            "pct": round(variant_per_split[split_name].get(v, 0) / split_counts[split_name] * 100, 1) if split_counts[split_name] else 0}
+                        for v in ["clean", "annotated", "mixed"]
+                    },
+                }
+                for split_name in ["train", "val", "test"]
+            },
+        },
+    }
+    log_path = log_dir / f"build_dataset_{timestamp}.json"
+    log_path.write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[INFO] 실행 로그: {log_path}")
+
+    # ------------------------------------------------------------------
+    # 샘플 저장 (train 첫 10건)
+    # ------------------------------------------------------------------
+    sample_dir = Path("data/samples")
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    for split_name, path in split_paths.items():
+        if split_counts[split_name] == 0:
+            continue
+        sample_path = sample_dir / f"{split_name}.sample.jsonl"
+        with open(path, "r", encoding="utf-8") as fin, \
+             open(sample_path, "w", encoding="utf-8") as fout:
+            for i, line in enumerate(fin):
+                if i >= 10:
+                    break
+                fout.write(line)
+    print(f"[INFO] 샘플 저장: {sample_dir}/{{train,val,test}}.sample.jsonl")
 
     # ------------------------------------------------------------------
     # HuggingFace DatasetDict 저장 (선택)
