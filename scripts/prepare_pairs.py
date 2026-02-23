@@ -21,7 +21,6 @@ import hashlib
 import json
 import random
 import re
-from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -524,41 +523,6 @@ def main() -> None:
     for v, c in variant_counts.items():
         pct = c / output_count * 100 if output_count > 0 else 0
         print(f"    {v}: {c:,}건 ({pct:.1f}%)")
-
-    # ------------------------------------------------------------------
-    # 실행 로그 저장
-    # ------------------------------------------------------------------
-    log_dir = Path("data/logs")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log = {
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "script": "prepare_pairs.py",
-        "args": {
-            "input": str(input_path),
-            "output": str(output_path),
-            "note_detection": args.note_detection,
-            "seed": args.seed,
-            "clean_ratio": ratios[0],
-            "annotated_ratio": ratios[1],
-            "mixed_ratio": ratios[2],
-            "limit": args.limit,
-        },
-        "stats": {
-            "input_count": total_loaded,
-            "no_translation": skipped_no_translation,
-            "duplicates_removed": dup_count,
-            "output_count": output_count,
-            "notes_removed": total_notes_removed,
-            "variants": {
-                v: {"count": c, "pct": round(c / output_count * 100, 1) if output_count else 0}
-                for v, c in variant_counts.items()
-            },
-        },
-    }
-    log_path = log_dir / f"prepare_pairs_{timestamp}.json"
-    log_path.write_text(json.dumps(log, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[INFO] 실행 로그: {log_path}")
 
     # ------------------------------------------------------------------
     # 샘플 저장 (첫 10건)
